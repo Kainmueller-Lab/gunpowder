@@ -109,6 +109,7 @@ class Train(GenericTrain):
             inputs,
             outputs,
             gradients,
+            is_training=None,
             summary=None,
             array_specs=None,
             save_every=2000,
@@ -126,6 +127,7 @@ class Train(GenericTrain):
         self.optimizer_loss_names = None
         self.optimizer = None
         self.loss = None
+        self.is_training = is_training
         self.summary = summary
         self.session = None
         self.tf_gradient = {}
@@ -155,9 +157,12 @@ class Train(GenericTrain):
         logger.info("Initializing tf session, connecting to %s...", target)
 
         self.graph = tf.Graph()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
         self.session = tf.Session(
             target=target,
-            graph=self.graph)
+            graph=self.graph,
+            config=config)
 
         with self.graph.as_default():
             self.__read_meta_graph()
@@ -178,10 +183,15 @@ class Train(GenericTrain):
                 self.loss,
                 [tensor])[0]
 
+        if self.is_training is not None:
+            self.is_training = self.graph.get_tensor_by_name(self.is_training)
+
     def train_step(self, batch, request):
 
         array_outputs = self.__collect_requested_outputs(request)
         inputs = self.__collect_provided_inputs(batch)
+        if self.is_training is not None:
+            inputs[self.is_training] = True
 
         to_compute = {
             'optimizer': self.optimizer,
