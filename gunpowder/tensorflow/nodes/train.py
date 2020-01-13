@@ -235,6 +235,11 @@ class Train(GenericTrain):
             self.is_training = tf.get_default_graph().get_tensor_by_name(
                 self.is_training)
 
+        try:
+            self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate:0")
+        except:
+            self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate/Merge:0")
+
     def train_step(self, batch, request):
 
         array_outputs = self.__collect_requested_outputs(request)
@@ -245,6 +250,7 @@ class Train(GenericTrain):
         to_compute = {
             'optimizer': self.optimizer,
             'loss': self.loss,
+            'lr': self.lr,
             'iteration': self.iteration_increment}
         to_compute.update(array_outputs)
 
@@ -267,7 +273,8 @@ class Train(GenericTrain):
                 spec)
 
         batch.loss = outputs['loss']
-        batch.iteration = outputs['iteration'][0]
+        batch.iteration = outputs['iteration']
+        self.current_lr = outputs['lr']
         if self.summary is not None and \
            (batch.iteration % self.log_every == 0 or batch.iteration == 1):
             self.summary_saver.add_summary(summaries, batch.iteration)
@@ -314,11 +321,14 @@ class Train(GenericTrain):
                 shape=1,
                 initializer=tf.zeros_initializer,
                 trainable=False)
-            self.iteration_increment = tf.assign(
-                self.iteration,
-                self.iteration + 1)
+            try:
+                self.iteration_increment = tf.get_default_graph().get_tensor_by_name("iteration_increment:0")
+            except KeyError:
+                self.iteration_increment = tf.assign(
+                    self.iteration,
+                    self.iteration + 1)
 
-        # Until now, only variables have been added to the graph that are part
+        # until now, only variables have been added to the graph that are part
         # of every checkpoint. We create a 'basic_saver' for only those
         # variables.
         self.basic_saver = tf.train.Saver(max_to_keep=None)

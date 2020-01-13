@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from .add_affinities import AddAffinities
 from .addCPV import AddCPV
+from .add_sdt import AddSdt
 from .balance_labels import BalanceLabels
 from .batch_filter import BatchFilter
 from .batch_provider import BatchProvider

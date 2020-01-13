@@ -175,15 +175,15 @@ class Predict(GenericPredict):
         '''The background predict process.'''
 
         # TODO: is the server still needed?
-        target = LocalServer.get_target()
-        logger.info("Initializing tf session, connecting to %s...", target)
+        # target = LocalServer.get_target()
+        # logger.info("Initializing tf session, connecting to %s...", target)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
         self.graph = tf.Graph()
         self.session = tf.Session(
-            target=target,
+            # target=target,
             graph=self.graph,
             config=config)
 
@@ -240,9 +240,11 @@ class Predict(GenericPredict):
         saver = tf.train.import_meta_graph(
                 meta_graph_file,
                 clear_devices=True)
+        logger.info("graph imported")
 
         # restore variables from checkpoint
         saver.restore(self.session, self.checkpoint)
+        logger.info("weights restored")
 
     def __collect_outputs(self, request=None):
         '''Get a dict:
