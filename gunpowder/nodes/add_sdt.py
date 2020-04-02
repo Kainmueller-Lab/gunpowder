@@ -4,7 +4,6 @@ import scipy.ndimage
 
 from .batch_filter import BatchFilter
 from gunpowder.coordinate import Coordinate
-from gunpowder.ext import malis
 from gunpowder.array import Array
 from gunpowder.points import Points
 from gunpowder.points import PointsKeys
