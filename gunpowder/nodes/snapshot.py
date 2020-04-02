@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import os
+import time
 
 from .batch_filter import BatchFilter
 from gunpowder.batch_request import BatchRequest
@@ -115,7 +116,7 @@ class Snapshot(BatchFilter):
                 self.output_dir,
                 self.output_filename.format(
                     id=str(batch.id).zfill(8),
-                    iteration=int(batch.iteration or 0)))
+                    iteration=int(batch.iteration or time.time())))
             logger.info('saving to %s' %snapshot_name)
             with h5py.File(snapshot_name, 'w') as f:
 
