@@ -93,8 +93,12 @@ class SpecifiedLocation(BatchFilter):
                 roi = spec.roi.shift(self.specified_shift)
                 specs_type[key].roi = roi
 
-        logger.debug("{}'th ({}) shift selected: {}".format(
-            self.loc_i, self.coordinates[self.loc_i], self.specified_shift))
+        if isinstance(self.coordinates, np.ndarray):
+            logger.debug("loc: {}/shift selected: {}".format(
+                self.loc_i, self.specified_shift))
+        else:
+            logger.debug("{}'th ({}) shift selected: {}".format(
+                self.loc_i, self.coordinates[self.loc_i], self.specified_shift))
 
         deps = request
         return deps
@@ -118,13 +122,23 @@ class SpecifiedLocation(BatchFilter):
         # gets next coordinate from list
 
         if self.choose_randomly:
-            self.loc_i = randrange(len(self.coordinates))
+            if isinstance(self.coordinates, np.ndarray):
+                fg = np.argwhere(self.coordinates)
+                self.loc_i = fg[np.random.choice(fg.shape[0])]
+            else:
+                self.loc_i = randrange(len(self.coordinates))
         else:
+            assert not isinstance(self.coordinates, np.ndarray), \
+                'only choose_randomly supported for ndarray masks'
             self.loc_i += 1
             if self.loc_i >= len(self.coordinates):
                 self.loc_i = 0
                 logger.warning('Ran out of specified locations, looping list')
-        next_shift = Coordinate(self.coordinates[self.loc_i]) - center_shift
+
+        if isinstance(self.coordinates, np.ndarray):
+            next_shift = Coordinate(self.loc_i - center_shift)
+        else:
+            next_shift = Coordinate(self.coordinates[self.loc_i]) - center_shift
 
         if self.jitter is not None:
             rnd = []
@@ -136,6 +150,7 @@ class SpecifiedLocation(BatchFilter):
         # make sure shift is a multiple of voxel size (round to nearest)
         next_shift = Coordinate([int(vs * round(float(shift)/vs)) for vs, shift in zip(voxel_size, next_shift)])
         logger.debug("Shift after rounding: %s" % str(next_shift))
+
         return next_shift
 
     def __check_shift(self, request):
