@@ -135,6 +135,9 @@ class ElasticAugment(BatchFilter):
 
             spec = spec.copy()
 
+            if "ANCHOR" == key.identifier:
+                continue
+
             if spec.roi is None:
                 continue
 
@@ -206,6 +209,9 @@ class ElasticAugment(BatchFilter):
     def process(self, batch, request):
 
         for (array_key, array) in batch.arrays.items():
+
+            if "ANCHOR" == array_key.identifier:
+                continue
 
             if array_key not in self.target_rois:
                 continue
