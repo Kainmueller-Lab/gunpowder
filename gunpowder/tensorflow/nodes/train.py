@@ -153,14 +153,14 @@ class Train(GenericTrain):
 
     def start(self):
 
-        target = LocalServer.get_target()
-        logger.info("Initializing tf session, connecting to %s...", target)
+        # target = LocalServer.get_target()
+        # logger.info("Initializing tf session, connecting to %s...", target)
 
         self.graph = tf.Graph()
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         self.session = tf.Session(
-            target=target,
+            # target=target,
             graph=self.graph,
             config=config)
 
