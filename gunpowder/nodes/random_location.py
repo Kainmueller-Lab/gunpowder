@@ -59,7 +59,10 @@ class RandomLocation(BatchFilter):
             Default value is 1.0.
     '''
 
-    def __init__(self, min_masked=0, mask=None, ensure_nonempty=None, p_nonempty=1.0):
+    def __init__(self, min_masked=0, mask=None, ensure_nonempty=None,
+                 p_nonempty=1.0,
+                 roi_subs_for_ensure_nonempty=None,
+                 accept_close_by_points=False):
 
         self.min_masked = min_masked
         self.mask = mask
@@ -70,6 +73,8 @@ class RandomLocation(BatchFilter):
         self.p_nonempty = p_nonempty
         self.upstream_spec = None
         self.random_shift = None
+        self.roi_subs_for_ensure_nonempty = roi_subs_for_ensure_nonempty
+        self.accept_close_by_points = accept_close_by_points
 
     def setup(self):
 
@@ -99,7 +104,7 @@ class RandomLocation(BatchFilter):
             logger.debug("chose %s as integral array dtype", mask_integral_dtype)
 
             self.mask_integral = np.array(mask_data > 0, dtype=mask_integral_dtype)
-            self.mask_integral = integral_image(self.mask_integral)
+            self.mask_integral = integral_image(self.mask_integral).astype(mask_integral_dtype)
 
         if self.ensure_nonempty:
 
@@ -209,7 +214,7 @@ class RandomLocation(BatchFilter):
         assert not total_shift_roi.unbounded(), (
             "Can not pick a random location, intersection of upstream ROIs is "
             "unbounded.")
-        assert total_shift_roi.size() > 0, (
+        assert sum(total_shift_roi.size()) > 0, (
             "Can not satisfy batch request, no location covers all requested "
             "ROIs.")
 
@@ -298,7 +303,16 @@ class RandomLocation(BatchFilter):
             lcm_shift_roi,
             lcm_voxel_size):
 
-        request_points_roi = request[self.ensure_nonempty].roi
+        if self.ensure_nonempty not in request:
+            if self.roi_subs_for_ensure_nonempty is not None:
+                request_points_roi = request[
+                    self.roi_subs_for_ensure_nonempty].roi
+            else:
+                raise Exception(
+                    'Please add ensure_nonempty to your batch request or '
+                    'specify substitute to use required roi from.')
+        else:
+            request_points_roi = request[self.ensure_nonempty].roi
 
         while True:
 
@@ -415,6 +429,13 @@ class RandomLocation(BatchFilter):
             # accept this shift with v=1/num_points
             #
             # This is to compensate the bias introduced by close-by points.
+            # TODO:
+            # if not self.accept_close_by_points:
+            #     accept = random() <= 1.0/num_points
+            #     if accept:
+            #         return random_shift
+            # else:
+            #     return random_shift
             accept = random() <= 1.0/num_points
             if accept:
                 return random_shift
@@ -422,9 +443,18 @@ class RandomLocation(BatchFilter):
     def __select_random_location(self, lcm_shift_roi, lcm_voxel_size):
 
         # select a random point inside ROI
-        random_shift = Coordinate(
-            randint(int(begin), int(end-1))
-            for begin, end in zip(lcm_shift_roi.get_begin(), lcm_shift_roi.get_end()))
+        # random_shift = Coordinate(
+        #     randint(int(begin), int(end-1))
+        #     for begin, end in zip(lcm_shift_roi.get_begin(), lcm_shift_roi.get_end()))
+        random_shift = []
+        for i, (begin, end) in enumerate(zip(lcm_shift_roi.get_begin(),
+                                             lcm_shift_roi.get_end())):
+            if int(begin) == int(end):
+                random_shift.append(int(begin))
+            else:
+                random_shift.append(randint(int(begin), int(end-1)))
+        random_shift = Coordinate(random_shift)
+
 
         random_shift *= lcm_voxel_size
 
