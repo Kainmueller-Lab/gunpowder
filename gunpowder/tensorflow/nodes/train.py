@@ -184,7 +184,16 @@ class Train(GenericTrain):
                 [tensor])[0]
 
         if self.is_training is not None:
-            self.is_training = self.graph.get_tensor_by_name(self.is_training)
+            self.is_training = tf.get_default_graph().get_tensor_by_name(
+                self.is_training)
+
+        try:
+            self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate:0")
+        except:
+            try:
+                self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate/Merge:0")
+            except:
+                self.lr = None
 
     def train_step(self, batch, request):
 
@@ -197,6 +206,8 @@ class Train(GenericTrain):
             'optimizer': self.optimizer,
             'loss': self.loss,
             'iteration': self.iteration_increment}
+        if self.lr is not None:
+            to_compute['lr'] = self.lr
         to_compute.update(array_outputs)
 
         # compute outputs, gradients, and update variables
@@ -214,10 +225,12 @@ class Train(GenericTrain):
 
         batch.loss = outputs['loss']
         batch.iteration = outputs['iteration'][0]
+        if self.lr is not None:
+            self.current_lr = outputs['lr']
         if self.summary is not None and (batch.iteration % self.log_every == 0 or batch.iteration == 1):
             self.summary_saver.add_summary(summaries, batch.iteration)
 
-        if batch.iteration%self.save_every == 0:
+        if batch.iteration % self.save_every == 0:
 
             checkpoint_name = (
                 self.meta_graph_filename +

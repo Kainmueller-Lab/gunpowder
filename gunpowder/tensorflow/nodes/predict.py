@@ -68,7 +68,7 @@ class Predict(GenericPredict):
             array_specs=None,
             graph=None,
             skip_empty=False,
-            max_shared_memory=1024*1024*1024):
+            max_shared_memory=4*1024*1024*1024):
 
         super(Predict, self).__init__(
             inputs,
@@ -267,9 +267,11 @@ class Predict(GenericPredict):
         saver = tf.train.import_meta_graph(
                 meta_graph_file,
                 clear_devices=True)
+        logger.info("graph imported")
 
         # restore variables from checkpoint
         saver.restore(self.session, self.checkpoint)
+        logger.info("weights restored")
 
     def __collect_outputs(self, request=None):
         '''Get a dict:
