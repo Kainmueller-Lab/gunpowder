@@ -251,6 +251,10 @@ class ElasticAugment(BatchFilter):
 
         for (graph_key, graph) in batch.graphs.items():
 
+            # TODO:
+            # if points_key not in request:
+            #     continue
+
             for node in list(graph.nodes):
 
                 logger.debug("projecting %s", node.location)

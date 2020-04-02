@@ -173,6 +173,7 @@ class BatchProvider(object):
             request_roi = request_spec.roi
 
             if provided_roi is not None:
+                # TODO:
                 assert provided_roi.contains(request_roi), "%s: %s's ROI %s outside of my ROI %s"%(self.name(), key, request_roi, provided_roi)
 
             if isinstance(key, ArrayKey):
@@ -244,6 +245,11 @@ class BatchProvider(object):
                                             request_spec.roi,
                                             graph.spec.roi,
                                             self.name())
+
+            # TODO:
+            # for loc_id in list(points.data.keys()):
+            #     if not points.spec.roi.contains(points.data[loc_id].location):
+            #         del points.data[loc_id]
 
             for node in graph.nodes:
                 contained = graph.spec.roi.contains(node.location)
