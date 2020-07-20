@@ -2,6 +2,8 @@ import logging
 import os
 import numpy as np
 
+import malis
+
 from gunpowder.array import ArrayKey, Array
 from gunpowder.ext import tensorflow as tf
 from gunpowder.nodes.generic_train import GenericTrain
@@ -114,6 +116,7 @@ class Train(GenericTrain):
             array_specs=None,
             save_every=2000,
             amp=False,
+            malis=False,
             log_dir='./',
             log_every=1):
 
@@ -142,6 +145,7 @@ class Train(GenericTrain):
         self.log_dir = log_dir
         self.log_every = log_every
         self.amp = amp
+        self.malis = malis
         # Check if optimizer is a str in python 2/3 compatible way.
         if isinstance(optimizer, ("".__class__, u"".__class__)):
             self.optimizer_loss_names = (optimizer, loss)
@@ -240,6 +244,18 @@ class Train(GenericTrain):
         except:
             self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate/Merge:0")
 
+        if self.malis:
+            gt_affs = tf.get_default_graph().get_tensor_by_name("gt_affs:0")
+            gt_seg = tf.get_default_graph().get_tensor_by_name("gt_seg:0")
+            pred_affs = tf.get_default_graph().get_tensor_by_name("pred_affs:0")
+            neighborhood = [[-1, 0, 0], [0, -1, 0], [0, 0, -1]]
+            weights = malis.malis_weights_op(
+                pred_affs,
+                gt_affs,
+                gt_seg,
+                neighborhood,
+                "malis_loss")
+
     def train_step(self, batch, request):
 
         array_outputs = self.__collect_requested_outputs(request)
@@ -268,6 +284,8 @@ class Train(GenericTrain):
         for array_key in array_outputs:
             spec = self.spec[array_key].copy()
             spec.roi = request[array_key].roi
+#            print(array_key, spec)
+#            print(outputs[array_key].shape)
             batch.arrays[array_key] = Array(
                 outputs[array_key],
                 spec)
