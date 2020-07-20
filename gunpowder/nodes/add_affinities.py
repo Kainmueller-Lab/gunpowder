@@ -7,7 +7,10 @@ from gunpowder.array import Array
 
 logger = logging.getLogger(__name__)
 
-
+# !!
+# SOURCE https://github.com/TuragaLab/malis
+# affinity computation taken from malis repo (and extended for differenet use cases)
+# !!
 def seg_to_affgraph_2d(seg, nhood):
     # constructs an affinity graph from a segmentation
     # assume affinity graph is represented as:
