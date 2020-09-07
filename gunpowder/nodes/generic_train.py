@@ -108,6 +108,13 @@ class GenericTrain(BatchFilter):
 
             self.provides(key, spec)
 
+    def prepare(self, request):
+        for key in self.inputs.values():
+            if not isinstance(key, ArrayKey):
+                continue
+            if key not in request:
+                request[key] = self.array_specs[key].copy()
+
     def teardown(self):
         if self.spawn_subprocess:
             # signal "stop"
