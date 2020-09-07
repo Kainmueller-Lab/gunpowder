@@ -200,7 +200,8 @@ class AddAffinities(BatchFilter):
             unlabelled=None,
             cityscape=False,
             cs_id=None,
-            affinities_mask=None):
+            affinities_mask=None,
+            dtype=np.uint8):
 
         self.affinity_neighborhood = np.array(affinity_neighborhood)
         self.labels = labels
@@ -211,6 +212,7 @@ class AddAffinities(BatchFilter):
         self.affinities_mask = affinities_mask
         self.cityscape = cityscape
         self.cs_id = cs_id
+        self.dtype = dtype
 
     def setup(self):
 
@@ -237,7 +239,7 @@ class AddAffinities(BatchFilter):
         spec = self.spec[self.labels].copy()
         if spec.roi is not None:
             spec.roi = spec.roi.grow(self.padding_neg, -self.padding_pos)
-        spec.dtype = np.float32
+        spec.dtype = self.dtype
 
         self.provides(self.affinities, spec)
         if self.affinities_mask:
@@ -294,8 +296,6 @@ class AddAffinities(BatchFilter):
 
         logger.debug("computing ground-truth affinities from labels")
         arr = batch.arrays[self.labels].data.astype(np.int32)
-        if arr.shape[0] == 1:
-            arr.shape = arr.shape[1:]
         if self.cityscape:
             pass
         elif self.multiple_labels and len(arr.shape) == 3:
@@ -312,13 +312,12 @@ class AddAffinities(BatchFilter):
                 arr,
                 self.affinity_neighborhood,
                 self.cs_id
-            ).astype(np.uint8)
+            ).astype(self.dtype)
         else:
             affinities = seg_to_affgraph_fun(
                 arr,
                 self.affinity_neighborhood
-            ).astype(np.uint8)
-
+            ).astype(self.dtype)
 
         # crop affinities to requested ROI
         offset = affinities_roi.get_offset()
