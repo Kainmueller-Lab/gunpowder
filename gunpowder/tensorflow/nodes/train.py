@@ -99,6 +99,13 @@ class Train(GenericTrain):
         log_every (``int``, optional):
 
             After how many iterations to write out tensorboard summaries.
+
+        snapshot_every (``int``, optional):
+
+            Only used in combination with use_tf_data, should have same
+            value as in potentially following snapshot node. Pass on inputs
+            downstream only in the matching iterations.
+
     '''
 
     def __init__(
@@ -113,8 +120,10 @@ class Train(GenericTrain):
             summary=None,
             array_specs=None,
             save_every=2000,
+            use_tf_data=False,
             log_dir='./',
-            log_every=1):
+            log_every=1,
+            snapshot_every=1):
 
         super(Train, self).__init__(
             inputs,
@@ -140,6 +149,8 @@ class Train(GenericTrain):
         self.summary_saver = None
         self.log_dir = log_dir
         self.log_every = log_every
+        self.snapshot_every = snapshot_every
+        self.use_tf_data = use_tf_data
         # Check if optimizer is a str in python 2/3 compatible way.
         if isinstance(optimizer, ("".__class__, u"".__class__)):
             self.optimizer_loss_names = (optimizer, loss)
@@ -156,29 +167,21 @@ class Train(GenericTrain):
         # target = LocalServer.get_target()
         # logger.info("Initializing tf session, connecting to %s...", target)
 
-        self.graph = tf.Graph()
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        self.session = tf.Session(
-            # target=target,
-            graph=self.graph,
-            config=config)
-
-        with self.graph.as_default():
-            self.__read_meta_graph()
+        checkpoint = self.__read_meta_graph()
 
         if self.summary is not None:
-            self.summary_saver = tf.summary.FileWriter(self.log_dir, self.graph)
+            self.summary_saver = tf.summary.FileWriter(
+                self.log_dir, tf.get_default_graph())
 
         if self.optimizer_func is None:
 
-            # get actual operations/tensors from names
-            self.optimizer = self.graph.get_operation_by_name(self.optimizer_loss_names[0])
-            self.loss = self.graph.get_tensor_by_name(self.optimizer_loss_names[1])
+            self.loss = tf.get_default_graph().get_tensor_by_name(
+                self.optimizer_loss_names[1])
 
         # add symbolic gradients
         for tensor_name in self.gradients:
-            tensor = self.graph.get_tensor_by_name(tensor_name)
+            tensor = tf.get_default_graph().get_tensor_by_name(
+                tensor_name)
             self.tf_gradient[tensor_name] = tf.gradients(
                 self.loss,
                 [tensor])[0]
@@ -186,6 +189,17 @@ class Train(GenericTrain):
         if self.is_training is not None:
             self.is_training = tf.get_default_graph().get_tensor_by_name(
                 self.is_training)
+
+        if self.optimizer_func is None:
+            # get actual operations/tensors from names
+            self.optimizer = tf.get_default_graph().get_operation_by_name(
+                self.optimizer_loss_names[0])
+
+        if self.session is None:
+            self.session = tf.Session(
+                # target=target
+            )
+            self.__restore_or_init_graph(checkpoint)
 
         try:
             self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate:0")
@@ -199,9 +213,11 @@ class Train(GenericTrain):
 
     def train_step(self, batch, request):
 
-        # initialize tf graph before first step
+        # initialize tf graph before first step,
+        # but after tf.data.Dataset has been created
         if not self.initialized:
             logger.info("first step, loading tf graph...")
+            self.tf_data = batch.tf_data
             self.start()
 
         array_outputs = self.__collect_requested_outputs(request)
@@ -217,11 +233,25 @@ class Train(GenericTrain):
             to_compute['lr'] = self.lr
         to_compute.update(array_outputs)
 
+        # pass on inputs to next gp node that are requested from downstream
+        # if snapshot is to be recorded (incurs overhead)
+        if self.use_tf_data and \
+           self.current_step % self.snapshot_every == 0:
+            for _, input_key in self.inputs.items():
+                if input_key in request:
+                    assert isinstance(input_key, ArrayKey), (
+                        "values in inputs dict have to be ArrayKeys (%s)" %
+                        input_key)
+                    to_compute[input_key] = self.tf_data[str(input_key)]
         # compute outputs, gradients, and update variables
-        if self.summary is not None:
-            outputs, summaries = self.session.run([to_compute, self.summary], feed_dict=inputs)
+        if self.use_tf_data:
+            feed_dict = None
         else:
-            outputs = self.session.run(to_compute, feed_dict=inputs)
+            feed_dict = inputs
+        if self.summary is not None:
+            outputs, summaries = self.session.run([to_compute, self.summary], feed_dict=feed_dict)
+        else:
+            outputs = self.session.run(to_compute, feed_dict=feed_dict)
 
         for array_key in array_outputs:
             spec = self.spec[array_key].copy()
@@ -230,10 +260,21 @@ class Train(GenericTrain):
                 outputs[array_key],
                 spec)
 
+        if self.use_tf_data and \
+           self.current_step % self.snapshot_every == 0:
+            for _, input_key in self.inputs.items():
+                if input_key in request:
+                    spec = self.spec[input_key].copy()
+                    spec.roi = request[input_key].roi
+                    batch.arrays[input_key] = Array(
+                        outputs[input_key],
+                        spec)
+
         batch.loss = outputs['loss']
         batch.iteration = outputs['iteration'][0]
         if self.lr is not None:
             self.current_lr = outputs['lr']
+        self.current_step = batch.iteration
         if self.summary is not None and (batch.iteration % self.log_every == 0 or batch.iteration == 1):
             self.summary_saver.add_summary(summaries, batch.iteration)
 
@@ -268,8 +309,16 @@ class Train(GenericTrain):
         logger.info("Reading meta-graph...")
 
         # read the original meta-graph
+        if self.use_tf_data:
+            input_map = {}
+            for k, v in self.inputs.items():
+                input_map[k] = self.tf_data[str(v)]
+        else:
+            input_map = None
+
         tf.train.import_meta_graph(
             self.meta_graph_filename + '.meta',
+            input_map=input_map,
             clear_devices=True)
 
         # add custom gunpowder variables
@@ -302,6 +351,10 @@ class Train(GenericTrain):
         checkpoint_dir = os.path.dirname(self.meta_graph_filename)
         checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
 
+        return checkpoint
+
+    def __restore_or_init_graph(self, checkpoint):
+
         if checkpoint:
 
             try:
@@ -325,6 +378,8 @@ class Train(GenericTrain):
 
             # initialize all variables
             self.session.run(tf.global_variables_initializer())
+
+        self.current_step = self.session.run(self.iteration)
 
     def __restore_graph(self, checkpoint, restore_full):
 
