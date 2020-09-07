@@ -92,6 +92,7 @@ class Snapshot(BatchFilter):
         self.enable_autoskip()
 
     def prepare(self, request):
+
         deps = BatchRequest()
 
         self.record_snapshot = self.n%self.every == 0
@@ -100,6 +101,11 @@ class Snapshot(BatchFilter):
         for array_key, spec in self.additional_request.array_specs.items():
             if array_key not in request.array_specs:
                 deps[array_key] = spec
+
+            for key in self.dataset_names.keys():
+                assert key in deps, (
+                    "%s wanted for %s, but not in request." %
+                    (key, self.name()))
 
         return deps
 
