@@ -60,6 +60,7 @@ class Batch(Freezable):
         self.affinity_neighborhood = None
         self.loss = None
         self.iteration = None
+        self.tf_data = None
 
         self.freeze()
 
