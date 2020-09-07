@@ -114,6 +114,15 @@ class GenericTrain(BatchFilter):
                 continue
             if key not in request:
                 request[key] = self.array_specs[key].copy()
+            else:
+                if request[key].roi is None:
+                    request[key].roi = self.array_specs[key].roi
+                if request[key].voxel_size is None:
+                    request[key].voxel_size = self.array_specs[key].voxel_size
+                if request[key].interpolatable is None:
+                    request[key].interpolatable = self.array_specs[key].interpolatable
+                if request[key].dtype is None:
+                    request[key].dtype = self.array_specs[key].dtype
 
     def teardown(self):
         if self.spawn_subprocess:
