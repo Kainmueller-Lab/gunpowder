@@ -108,12 +108,6 @@ class GenericTrain(BatchFilter):
 
             self.provides(key, spec)
 
-        if self.spawn_subprocess:
-            self.worker.start()
-        else:
-            self.start()
-            self.initialized = True
-
     def teardown(self):
         if self.spawn_subprocess:
             # signal "stop"
@@ -191,11 +185,6 @@ class GenericTrain(BatchFilter):
 
     def __produce_train_batch(self):
         '''Process one train batch.'''
-
-        if not self.initialized:
-
-            self.start()
-            self.initialized = True
 
         batch, request = self.batch_in.get()
 
