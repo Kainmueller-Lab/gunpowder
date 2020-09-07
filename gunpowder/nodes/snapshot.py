@@ -93,6 +93,11 @@ class Snapshot(BatchFilter):
             if array_key not in request.array_specs:
                 request.array_specs[array_key] = spec
 
+            for key in self.dataset_names.keys():
+                assert key in request, (
+                    "%s wanted for %s, but not in request." %
+                    (key, self.name()))
+
     def process(self, batch, request):
 
         if self.record_snapshot:
