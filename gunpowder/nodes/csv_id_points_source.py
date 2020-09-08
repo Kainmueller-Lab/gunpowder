@@ -37,18 +37,21 @@ class CsvIDPointsSource(BatchProvider):
             positions to convert them to world units.
     '''
 
-    def __init__(self, filename, points, points_spec=None, scale=None):
+    def __init__(self, filename, points, points_spec=None, scale=None, ndims=None):
 
         self.filename = filename
         self.points = points
         self.points_spec = points_spec
         self.scale = scale
-        self.ndims = None
+        self.ndims = ndims
         self.data = None
 
     def setup(self):
 
-        self._read_points()
+        if self.ndims is not None:
+            self._read_points(self.ndims)
+        else:
+            self._read_points()
 
         if self.points_spec is not None:
 
@@ -102,8 +105,8 @@ class CsvIDPointsSource(BatchProvider):
             # for i, p in zip(ids, filtered)
         }
 
-    def _read_points(self):
-        self.data, self.ndims = self._parse_csv(ndims=3)
+    def _read_points(self, ndims=3):
+        self.data, self.ndims = self._parse_csv(ndims=ndims)
 
     def _parse_csv(self, ndims=0):
         '''Read one point per line. If ``ndims`` is 0, all values in one line
