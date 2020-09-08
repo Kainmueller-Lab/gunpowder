@@ -288,6 +288,8 @@ class AddAffinities(BatchFilter):
 
         logger.debug("computing ground-truth affinities from labels")
         arr = batch.arrays[self.labels].data.astype(np.int32)
+        if arr.shape[0] == 1:
+            arr.shape = arr.shape[1:]
         if self.cityscape:
             pass
         elif self.multiple_labels and len(arr.shape) == 3:
