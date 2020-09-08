@@ -82,10 +82,15 @@ class Train(GenericTrain):
             Name of is_training placeholder tensor used to switch between
             training and evaluation mode for dropout/batch norm etc
 
-        summary (``string``, optional):
+        summary (``string`` or
+                 ``dict``, ``string`` -> (``string`` (tensor name), freq),
+                 optional):
 
             The name of the tensorflow tensor containing the tensorboard
-            summaries.
+            summaries or dictionary for different subcategories of summaires
+            (key: string, value: tuple with tensor/op name and frequency,
+            of evaluation).
+
 
         array_specs (``dict``, :class:`ArrayKey` -> :class:`ArraySpec`, optional):
 
@@ -308,16 +313,15 @@ class Train(GenericTrain):
             feed_dict = None
         else:
             feed_dict = inputs
-        if self.summary is not None:
-            outputs, summaries = self.session.run(
-                [to_compute, self.summary], feed_dict=feed_dict,
-                # options=run_options
-            )
-        else:
-            outputs = self.session.run(
-                to_compute, feed_dict=feed_dict,
-                # options=run_options
-            )
+        if isinstance(self.summary, str):
+            to_compute["summaries"] = self.summary
+        elif isinstance(self.summary, dict):
+            for k, (v, f) in self.summary.items():
+                if f % (self.current_step+1) == 0:
+                    to_compute[k] = v
+        outputs = self.session.run(to_compute, feed_dict=feed_dict,
+                                   # options=run_options
+                                   )
 
         for array_key in array_outputs:
             spec = self.spec[array_key].copy()
@@ -343,9 +347,16 @@ class Train(GenericTrain):
         if self.lr is not None:
             self.current_lr = outputs['lr']
         self.current_step = batch.iteration
-        if self.summary is not None and \
-           (batch.iteration % self.log_every == 0 or batch.iteration == 1):
-            self.summary_saver.add_summary(summaries, batch.iteration)
+        if self.summary is not None:
+            if isinstance(self.summary, str) and \
+               (batch.iteration % self.log_every == 0 or batch.iteration == 1):
+                self.summary_saver.add_summary(
+                            outputs['summaries'], batch.iteration)
+            else:
+                for k, (_, f) in self.summary.items():
+                    if f % (self.current_step+1) == 0:
+                        self.summary_saver.add_summary(
+                            outputs[k], batch.iteration)
 
         if batch.iteration % self.save_every == 0:
 
