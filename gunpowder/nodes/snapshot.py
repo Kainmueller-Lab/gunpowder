@@ -93,10 +93,10 @@ class Snapshot(BatchFilter):
             if array_key not in request.array_specs:
                 request.array_specs[array_key] = spec
 
-            for key in self.dataset_names.keys():
-                assert key in request, (
-                    "%s wanted for %s, but not in request." %
-                    (key, self.name()))
+        for key in self.dataset_names.keys():
+            assert key in request, (
+                "%s wanted for %s, but not in request." %
+                (key, self.name()))
 
     def process(self, batch, request):
 
@@ -127,7 +127,7 @@ class Snapshot(BatchFilter):
                         dataset = f.create_dataset(name=ds_name, data=array.data.astype(dtype), compression=self.compression_type)
                     else:
                         dataset = f.create_dataset(name=ds_name, data=array.data, compression=self.compression_type)
-                    
+
                     if array.spec.roi is not None:
                         dataset.attrs['offset'] = array.spec.roi.get_offset()
                     dataset.attrs['resolution'] = self.spec[array_key].voxel_size
@@ -145,4 +145,3 @@ class Snapshot(BatchFilter):
                     f['/'].attrs['loss'] = batch.loss
 
         self.n += 1
-

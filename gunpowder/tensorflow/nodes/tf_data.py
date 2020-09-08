@@ -51,7 +51,7 @@ class TFData(BatchFilter):
 
         if request != self.current_request:
 
-            assert not request.graph_specs, "cannot handle graph/point specs"
+            assert not request.points_specs, "cannot handle graph/point specs"
 
             self.current_request = copy.deepcopy(request)
 

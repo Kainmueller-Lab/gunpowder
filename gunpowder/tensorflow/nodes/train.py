@@ -190,6 +190,12 @@ class Train(GenericTrain):
         # target = LocalServer.get_target()
         # logger.info("Initializing tf session, connecting to %s...", target)
 
+        # from tensorflow.core.protobuf import rewriter_config_pb2
+        # config = tf.ConfigProto()
+        # config.graph_options.rewrite_options.layout_optimizer=rewriter_config_pb2.RewriterConfig.OFF
+        # config.gpu_options.allow_growth = True
+        # config.allow_soft_placement = True
+
         if self.auto_mixed_precision:
             with tf.variable_scope("amp_opt"):
                 assert self.learning_rate is not None, (
@@ -240,7 +246,8 @@ class Train(GenericTrain):
 
         if self.session is None:
             self.session = tf.Session(
-                # target=target
+                # target=target,
+                # config=config
             )
             self.__restore_or_init_graph(checkpoint)
 
@@ -294,6 +301,8 @@ class Train(GenericTrain):
                         "values in inputs dict have to be ArrayKeys (%s)" %
                         input_key)
                     to_compute[input_key] = self.tf_data[str(input_key)]
+
+        run_options = tf.RunOptions(report_tensor_allocations_upon_oom=True)
         # compute outputs, gradients, and update variables
         if self.use_tf_data:
             feed_dict = None
@@ -301,10 +310,14 @@ class Train(GenericTrain):
             feed_dict = inputs
         if self.summary is not None:
             outputs, summaries = self.session.run(
-                [to_compute, self.summary], feed_dict=feed_dict)
+                [to_compute, self.summary], feed_dict=feed_dict,
+                # options=run_options
+            )
         else:
             outputs = self.session.run(
-                to_compute, feed_dict=feed_dict)
+                to_compute, feed_dict=feed_dict,
+                # options=run_options
+            )
 
         for array_key in array_outputs:
             spec = self.spec[array_key].copy()

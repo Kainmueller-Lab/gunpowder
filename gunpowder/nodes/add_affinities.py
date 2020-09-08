@@ -333,6 +333,7 @@ class AddAffinities(BatchFilter):
 
         spec = self.spec[self.affinities].copy()
         spec.roi = affinities_roi
+        # spec.dtype = affinities.dtype
         batch.arrays[self.affinities] = Array(affinities, spec)
 
         if self.affinities_mask and self.affinities_mask in request:

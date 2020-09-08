@@ -73,7 +73,6 @@ class Predict(GenericPredict):
             array_specs=None,
             graph=None,
             skip_empty=False,
-            max_shared_memory=2*1024*1024*1024):
             is_training=None,
             max_shared_memory=4*1024*1024*1024):
 

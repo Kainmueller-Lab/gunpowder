@@ -108,6 +108,18 @@ class GenericTrain(BatchFilter):
 
             self.provides(key, spec)
 
+    def teardown(self):
+        if self.spawn_subprocess:
+            # signal "stop"
+            self.batch_in.put((None, None))
+            try:
+                self.worker.get(timeout=2)
+            except NoResult:
+                pass
+            self.worker.stop()
+        else:
+            self.stop()
+
     def prepare(self, request):
         for key in self.inputs.values():
             if not isinstance(key, ArrayKey):
@@ -123,18 +135,6 @@ class GenericTrain(BatchFilter):
                     request[key].interpolatable = self.array_specs[key].interpolatable
                 if request[key].dtype is None:
                     request[key].dtype = self.array_specs[key].dtype
-
-    def teardown(self):
-        if self.spawn_subprocess:
-            # signal "stop"
-            self.batch_in.put((None, None))
-            try:
-                self.worker.get(timeout=2)
-            except NoResult:
-                pass
-            self.worker.stop()
-        else:
-            self.stop()
 
     def process(self, batch, request):
 
