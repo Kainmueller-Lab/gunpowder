@@ -259,7 +259,10 @@ class Train(GenericTrain):
         try:
             self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate:0")
         except:
-            self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate/Merge:0")
+            try:
+                self.lr = tf.get_default_graph().get_tensor_by_name("learning-rate/Merge:0")
+            except:
+                self.lr = None
 
         if self.malis:
             gt_affs = tf.get_default_graph().get_tensor_by_name("gt_affs:0")
@@ -292,8 +295,9 @@ class Train(GenericTrain):
         to_compute = {
             'optimizer': self.optimizer,
             'loss': self.loss,
-            'lr': self.lr,
             'iteration': self.iteration_increment}
+        if self.lr is not None:
+            to_compute['lr'] = self.lr
         to_compute.update(array_outputs)
 
         # pass on inputs to next gp node that are requested from downstream
