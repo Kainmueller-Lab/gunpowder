@@ -45,13 +45,19 @@ class Hdf5LikeSource(BatchProvider):
             to be (channels, spatial dimensions). This is recommended due to
             better performance. If channels_first is set to false, then the input
             data is read in channels_last manner and converted to channels_first.
+
+        load_to_mem (``bool``, optional):
+
+            Should all data be directly loaded to memory instead of loading
+            on demand? Higher memory usage but less IO
     '''
     def __init__(
             self,
             filename,
             datasets,
             array_specs=None,
-            channels_first=True):
+            channels_first=True,
+            load_to_mem=False):
 
         self.filename = filename
         self.datasets = datasets
@@ -66,6 +72,10 @@ class Hdf5LikeSource(BatchProvider):
         # number of spatial dimensions
         self.ndims = None
 
+        self.load_to_mem = load_to_mem
+        if self.load_to_mem:
+            self.data = {}
+
     def _open_file(self, filename):
         raise NotImplementedError('Only implemented in subclasses')
 
@@ -77,6 +87,9 @@ class Hdf5LikeSource(BatchProvider):
                     raise RuntimeError("%s not in %s" % (ds_name, self.filename))
 
                 spec = self.__read_spec(array_key, data_file, ds_name)
+
+                if self.load_to_mem:
+                    self.data[ds_name] = np.array(data_file[ds_name])
 
                 self.provides(array_key, spec)
 
@@ -187,11 +200,15 @@ class Hdf5LikeSource(BatchProvider):
     def __read(self, data_file, ds_name, roi):
 
         c = len(data_file[ds_name].shape) - self.ndims
+        if self.load_to_mem:
+            data = self.data[ds_name]
+        else:
+            data = data_file[ds_name]
 
         if self.channels_first:
-            array = np.asarray(data_file[ds_name][(slice(None),) * c + roi.to_slices()])
+            array = np.asarray(data[(slice(None),) * c + roi.to_slices()])
         else:
-            array = np.asarray(data_file[ds_name][roi.to_slices() + (slice(None),) * c])
+            array = np.asarray(data[roi.to_slices() + (slice(None),) * c])
             array = np.transpose(array,
                                  axes=[i + self.ndims for i in range(c)] + list(range(self.ndims)))
 
