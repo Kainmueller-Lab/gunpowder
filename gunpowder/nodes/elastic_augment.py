@@ -167,6 +167,13 @@ class ElasticAugment(BatchFilter):
             if spec.roi is None:
                 continue
 
+            # the padding necessary for elastic augment varies for each
+            # iteration, by using an otherwise ignored anchor array, padding
+            # can be set to None for all proper data and the roi is still
+            # well defined.
+            if "ANCHOR" == key.identifier:
+                continue
+
             target_roi = Roi(
                 spec.roi.get_begin()[-self.spatial_dims :],
                 spec.roi.get_shape()[-self.spatial_dims :],
