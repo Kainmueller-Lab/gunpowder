@@ -265,7 +265,7 @@ class Scan(BatchFilter):
 
         while True:
 
-            logger.debug("adding %s", shift)
+            logger.info("adding %s", shift)
             shifts.append(Coordinate(shift))
 
             if (shift == max_shift).all():
