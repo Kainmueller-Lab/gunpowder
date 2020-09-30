@@ -24,20 +24,22 @@ class SpecifiedLocation(BatchFilter):
 
     Args:
 
-        locations (``list`` of locations):
+        locations (``list`` of locations or ``ndarray``):
 
             Locations to center batches around.
+            List of coordinates or boolean mask.
 
         choose_randomly (``bool``):
 
             Defines whether locations should be picked in order or at random
             from the list.
 
-        extra_data (``list`` of array-like):
+        extra_data (``list`` or ``array-like`` of array-like):
 
             A list of data that will be passed along with the arrays provided
             by this node. This data will be appended as an attribute to the
             dataset so it must be a data format compatible with hdf5.
+            Type must be compatible to locations.
 
         jitter (``tuple`` of int):
 
@@ -121,13 +123,23 @@ class SpecifiedLocation(BatchFilter):
         # gets next coordinate from list
 
         if self.choose_randomly:
-            self.loc_i = randrange(len(self.coordinates))
+            if isinstance(self.coordinates, np.ndarray):
+                fg = np.argwhere(self.coordinates)
+                self.loc_i = Coordinate(np.random.choice(fg)) * voxel_size
+            else:
+                self.loc_i = randrange(len(self.coordinates))
         else:
+            assert not isinstance(self.coordinates, np.ndarray), \
+                'only choose_randomly=True supported for ndarray masks'
             self.loc_i += 1
             if self.loc_i >= len(self.coordinates):
                 self.loc_i = 0
                 logger.warning('Ran out of specified locations, looping list')
-        next_shift = Coordinate(self.coordinates[self.loc_i]) - center_shift
+
+        if isinstance(self.coordinates, np.ndarray):
+            next_shift = Coordinate(self.loc_i - center_shift)
+        else:
+            next_shift = Coordinate(self.coordinates[self.loc_i] - center_shift)
 
         if self.jitter is not None:
             rnd = []
