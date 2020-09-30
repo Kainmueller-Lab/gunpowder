@@ -44,6 +44,14 @@ class GrowBoundary(BatchFilter):
         gt = batch.arrays[self.labels]
         gt_mask = None if not self.mask else batch.arrays[self.mask]
 
+        if gt.shape[0] == 1:
+            squeezed = True
+            gt.data = np.squeeze(gt.data, axis=0)
+            if gt_mask is not None:
+                gt_mask.data = np.squeeze(gt_mask.data, axis=0)
+        else:
+            squeezed = False
+
         if gt_mask is not None:
 
             # grow only in area where mask and gt are defined
@@ -60,6 +68,11 @@ class GrowBoundary(BatchFilter):
         else:
 
             self.__grow(gt.data, only_xy=self.only_xy)
+
+        if squeezed:
+            gt.data = np.expand_dims(gt.data, axis=0)
+            if gt_mask is not None:
+                gt_mask.data = np.expand_dims(gt_mask.data, axis=0)
 
     def __grow(self, gt, gt_mask=None, only_xy=False):
         if gt_mask is not None:
