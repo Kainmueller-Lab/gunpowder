@@ -323,6 +323,18 @@ class RasterizePoints(BatchFilter):
                 arr_crop_ind = arr_crop.get_bounding_box()
                 kernel_crop_ind = kernel_crop.get_bounding_box()
 
+
+                if 'value' in node.attrs() and \
+                   node.attrs()['value'] is not None:
+                    rasterized_points[arr_crop_ind] = \
+                        node.attrs()['value'] * np.logical_and(
+                            ball_kernel[kernel_crop_ind],
+                            rasterized_points[arr_crop_ind]==0)
+                else:
+                    rasterized_points[arr_crop_ind] = np.logical_or(
+                        ball_kernel[kernel_crop_ind],
+                        rasterized_points[arr_crop_ind])
+
                 rasterized_points[arr_crop_ind] = np.logical_or(
                     ball_kernel[kernel_crop_ind],
                     rasterized_points[arr_crop_ind])
