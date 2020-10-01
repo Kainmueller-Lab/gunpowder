@@ -9,6 +9,132 @@ from gunpowder.ext import malis
 
 logger = logging.getLogger(__name__)
 
+
+def seg_to_affgraph_2d(seg, nhood):
+    # constructs a 2d affinity graph from a segmentation
+    # assume affinity graph is represented as:
+    # shape = (e, y, x)
+    # nhood.shape = (edges, 2)
+    shape = seg.shape
+    nEdge = nhood.shape[0]
+
+    aff = np.zeros((nEdge,)+shape,dtype=np.int32)
+
+    for e in range(nEdge):
+        # first == second pixel?
+        tt1 = seg[
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])]
+        tt2 = seg[
+            max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+            max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])]
+        t1 = tt1 == tt2
+        # first pixel fg?
+        t2 = seg[
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] > 0
+        # second pixel fg?
+        t3 = seg[
+            max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+            max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] > 0
+        aff[e,
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] = t1 * t2 * t3
+
+    return aff
+
+def seg_to_affgraph_2d_multi(seg, nhood):
+    # constructs a 2d affinity graph from a segmentation
+    # there can be multiple labels per pixel
+    # assume affinity graph is represented as:
+    # shape = (e, y, x)
+    # nhood.shape = (edges, 2)
+    shape = seg.shape[1:]
+    nEdge = nhood.shape[0]
+
+    aff = np.zeros((nEdge,)+shape,dtype=np.int32)
+
+    for e in range(nEdge):
+        # first == second pixel?
+        tt1 = seg[
+            :,
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])]
+        tt2 = seg[
+            :,
+            max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+            max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])]
+        t1 = tt1 == tt2
+        t1[tt1==0] = False
+        t1 = np.any(t1, axis=0, keepdims=True)
+
+        # first pixel fg?
+        t2 = np.any(seg[
+            :,
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])],
+                    axis=0)
+
+        # second pixel fg?
+        t3 = np.any(seg[
+            :,
+            max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+            max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])],
+                    axis=0)
+
+        aff[e,
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] = t1 * t2 * t3
+
+    return aff
+
+def seg_to_affgraph_2d_cs(seg, nhood, cs_id=None):
+    # constructs a 2d affinity graph from a segmentation for cityscapes
+    # assume affinity graph is represented as:
+    # shape = (e, y, x)
+    # nhood.shape = (edges, 2)
+    shape = seg.shape
+    nEdge = nhood.shape[0]
+
+    aff = np.zeros((nEdge,)+shape,dtype=np.int32)
+
+    for e in range(nEdge):
+        # first == second pixel?
+        tt1 = seg[
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])]
+        tt2 = seg[
+            max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+            max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])]
+        t1 = tt1 == tt2
+
+        if cs_id is not None:
+            # first pixel fg?
+            t2 = np.logical_and(
+                seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+                    max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] >= cs_id,
+                seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+                    max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] < cs_id + 1000)
+            # second pixel fg?
+            t3 = np.logical_and(
+                seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+                    max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] >= cs_id,
+                seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+                    max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] < cs_id + 1000)
+        else:
+            # first pixel fg?
+            t2 = seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+                     max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] > 255
+            # second pixel fg?
+            t3 = seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]),
+                     max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] > 255
+        aff[e,
+            max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]),
+            max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] = t1 * t2 * t3
+
+    return aff
+
+
 class AddAffinities(BatchFilter):
     '''Add an array with affinities for a given label array and neighborhood to 
     the batch. Affinity values are created one for each voxel and entry in the 
@@ -58,6 +184,9 @@ class AddAffinities(BatchFilter):
             labels_mask=None,
             unlabelled=None,
             affinities_mask=None,
+            multiple_labels=False,
+            cityscape=False,
+            cs_id=None,
             dtype=np.uint8):
 
         self.affinity_neighborhood = np.array(affinity_neighborhood)
@@ -66,6 +195,9 @@ class AddAffinities(BatchFilter):
         self.labels_mask = labels_mask
         self.affinities = affinities
         self.affinities_mask = affinities_mask
+        self.multiple_labels = multiple_labels
+        self.cityscape = cityscape
+        self.cs_id = cs_id
         self.dtype = dtype
 
     def setup(self):
@@ -147,10 +279,27 @@ class AddAffinities(BatchFilter):
         arr = batch.arrays[self.labels].data.astype(np.int32)
         if arr.shape[0] == 1:
             arr.shape = arr.shape[1:]
-        affinities = malis.seg_to_affgraph(
-            arr,
-            self.affinity_neighborhood
-        ).astype(self.dtype)
+
+        if self.cityscape:
+            affinities = seg_to_affgraph_2d_cs(
+                arr,
+                self.affinity_neighborhood,
+                self.cs_id)
+        else:
+            if self.multiple_labels and len(arr.shape) == 3:
+                seg_to_affgraph_fun = seg_to_affgraph_2d_multi
+            elif len(arr.shape) == 2:
+                seg_to_affgraph_fun = seg_to_affgraph_2d
+            elif self.multiple_labels and len(arr.shape) == 4:
+                raise NotImplementedError
+            else:
+                seg_to_affgraph_fun = malis.seg_to_affgraph
+
+            affinities = seg_to_affgraph_fun(
+                arr,
+                self.affinity_neighborhood)
+
+        affinities = affinities.astype(self.dtype)
 
         # crop affinities to requested ROI
         offset = affinities_roi.get_offset()
